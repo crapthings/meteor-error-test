@@ -35,6 +35,8 @@ if (Meteor.isClient) {
   }
 }
 
+MeteorCall = Meteor.isClient ? Meteor.callPromise : Meteor.call
+
 const Users = Meteor.users
 const Groups = new Mongo.Collection('groups')
 const GroupMembers = new Mongo.Collection('groupmembers')
@@ -72,12 +74,21 @@ Meteor.methods({
   'test1'(props) {
     throw new Meteor.Error('500', '方法错误', '方法错误详情')
   },
+
+  'find.issuemembers'(userId) {
+    userId = userId || Meteor.userId()
+    return IssueMembers.find({ userId}).fetch()
+  }
 })
 
 // 报错 publish
 if (Meteor.isServer) {
   Meteor.publish('undefined1', function () {
     throw new Meteor.Error('404', '啥啥没找到', '没找到详情')
+  })
+
+  Meteor.publish(null, function () {
+    console.log(Meteor.user().issueIds())
   })
 }
 
@@ -89,16 +100,43 @@ if (Meteor.isClient) {
     document.body.appendChild(app)
     render(<div>
       <ErrorComponent />
-      <button onClick={() => Meteor.call('create.issue', { title: 'this is a title' })}>方法错误 schema failed</button>
-      <button onClick={() => Meteor.call('create.issue', { title: 'this is a title', groupId: '123' })}>groupId不存在 groupId 123</button>
-      <button onClick={() => Meteor.call('test1')}>方法错误内 throw</button>
-      <button onClick={() => Meteor.subscribe('undefined1')}>订阅错误1</button>
-      <button onClick={() => Meteor.subscribe('undefined2', { test: 1 }, { test: 2 }, { test: 2 }, )}>订阅错误2带参数</button>
-      <button onClick={() => Meteor.subscribe('undefined2', { onStop(err) { OutputErrorTo({ error: 500, reason: '不知道', details: 'oh yeah' }) } }, )}>订阅报错自定</button>
-      <button onClick={() => {
-        throw new Meteor.Error(500, '自定报错', '报错详情')
-        alert('我不应该执行')
-      }}>new Meteor.Error</button>
+      <div>
+        <button onClick={() => Meteor.call('create.issue', { title: 'this is a title' })}>方法错误 schema failed</button>
+        <button onClick={() => Meteor.call('create.issue', { title: 'this is a title', groupId: '123' })}>groupId不存在 groupId 123</button>
+        <button onClick={() => Meteor.call('test1')}>方法错误内 throw</button>
+      </div>
+      <div>
+        <button onClick={() => Meteor.subscribe('undefined1')}>自动订阅错误1</button>
+        <button onClick={() => Meteor.subscribe('undefined2', { test: 1 }, { test: 2 }, { test: 2 }, )}>自动订阅错误2带参数</button>
+        <button onClick={() => Meteor.subscribe('undefined2', { onStop(err) { OutputErrorTo({ error: 500, reason: '不知道', details: 'oh yeah' }) } }, )}>手动订阅错误</button>
+      </div>
+      <div>
+        <button onClick={() => {
+          throw new Meteor.Error(500, '自定报错', '报错详情')
+          alert('我不应该执行')
+        }}>new Meteor.Error</button>
+      </div>
+      <div>
+        <button onClick={() => Meteor.loginWithPassword('hong@cubes.legal', '123', err => !err && alert('登录成功'))}>hong</button>
+        <button onClick={async () => console.log(await Meteor.user().issueIds())}>事务成员 console.log</button>
+      </div>
     </div>, app)
   })
 }
+
+// global helper
+Users.helpers({
+  issueIds(userId) {
+    userId =  userId || this.userId
+    return MeteorCall('find.issuemembers', userId)
+  }
+})
+
+Meteor.methods({
+  hack() {
+    Meteor.isServer && _.each(Meteor.users.find().fetch(), user => {
+      Accounts.setPassword(user._id, '123')
+    })
+    console.log('reset all password')
+  }
+})
