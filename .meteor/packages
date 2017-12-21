@@ -22,3 +22,5 @@ dburles:collection-helpers
 mikowals:batch-insert
 promise
 deanius:promise
+
+crapthings:subscribe-call-apply-wrapper
